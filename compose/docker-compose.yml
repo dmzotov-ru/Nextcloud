@@ -1,0 +1,70 @@
+version: '3'
+
+services:
+  db:
+    image: postgres:alpine
+    restart: always
+    volumes:
+      - /mnt/db/pgdata:/var/lib/postgresql/data
+    env_file:
+      - db.env
+
+  redis:
+    image: redis:alpine
+    restart: always
+
+  app:
+    container_name: nextcloud
+    image: nextcloud    
+    build: ./nextcloud
+    restart: always
+    volumes:
+      - ../content:/var/www/html
+    environment:
+      - POSTGRES_HOST=db
+      - REDIS_HOST=redis
+#      - OBJECTSTORE_S3_HOST=s3pre.oss.dev.cloud
+#      - OBJECTSTORE_S3_BUCKET=nextcloud
+#      - OBJECTSTORE_S3_KEY=nextcloud
+#      - OBJECTSTORE_S3_SECRET=${S3ACCESS}
+#      - OBJECTSTORE_S3_PORT=9000
+#      - OBJECTSTORE_S3_SSL=true
+#      - OBJECTSTORE_S3_REGION=ICLCLOUD
+#      - OBJECTSTORE_S3_USEPATH_STYLE=true
+#      - OBJECTSTORE_S3_AUTOCREATE=false
+#      - OBJECTSTORE_S3_LEGACYAUTH=true
+#      - CAFILE=/etc/ssl/certs/ca-cert-ca-oss-dev-cloud.pem.pem  
+    env_file:
+      - db.env
+    depends_on:
+      - db
+      - redis
+
+  web:
+    container_name: nginx 
+    image: nginx      
+    build: ./web
+    restart: always
+    volumes:
+      - ../content:/var/www/html:ro
+    environment:
+      - VIRTUAL_HOST=nextcloud.oss.dev.cloud
+    expose:
+      - 80
+    ports:
+      - 80:80
+    depends_on:
+      - app
+
+  cron:
+    image: nextcloud:fpm-alpine
+    restart: always
+    volumes:
+      - ../content:/var/www/html
+    entrypoint: /cron.sh
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  nextcloud:
